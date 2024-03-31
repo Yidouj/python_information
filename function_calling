@@ -1,0 +1,1258 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "e60d4096-3f7e-455d-a6dd-c78d81cf9953",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import pandas as pd\n",
+    "import json\n",
+    "import inspect\n",
+    "import openai\n",
+    "openai.api_key = os.getenv(\"OPENAI_API_KEY\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "53da53fa-b1c7-4b83-af9f-f2084c28a041",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 1.定义功能函数\n",
+    "def calculate_total_age_function(input_json):\n",
+    "    \"\"\"\n",
+    "    从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\n",
+    "\n",
+    "    参数:\n",
+    "    input_json (str): 包含个体数据的JSON格式字符串。\n",
+    "\n",
+    "    返回:\n",
+    "    str: 所有人的年龄总和，以JSON格式返回。\n",
+    "    \"\"\"\n",
+    "\n",
+    "    # 将JSON字符串转换为DataFrame\n",
+    "    df = pd.read_json(input_json, orient='split')\n",
+    "\n",
+    "    # 计算所有人的年龄总和\n",
+    "    total_age = df['Age'].sum()\n",
+    "\n",
+    "    # 将结果转换为字符串形式，然后使用json.dumps()转换为JSON格式\n",
+    "    return json.dumps({\"total_age\": str(total_age)})\n",
+    "\n",
+    "# 2.将功能函数存储至外部函数仓库\n",
+    "function_repository = {\n",
+    "            \"calculate_total_age_function\": calculate_total_age_function,\n",
+    "        }\n",
+    "\n",
+    "\n",
+    "# 3.构建功能函数的Json Schema描述\n",
+    "calculate_total_age_describe = {\"name\": \"calculate_total_age_function\",\n",
+    "                      \"description\": \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+    "                      \"parameters\": {\"type\": \"object\",\n",
+    "                                     \"properties\": {\"input_json\": {\"type\": \"string\",\n",
+    "                                                             \"description\": \"执行计算年龄总和的数据集\"},\n",
+    "                                                   },\n",
+    "                                     \"required\": [\"input_json\"],\n",
+    "                                    },\n",
+    "                     }\n",
+    "\n",
+    "\n",
+    "# 4. 添加到functions列表中，在对话过程中作为函数库传递给function参数\n",
+    "functions = [calculate_total_age_describe]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "9d6613f7-527e-4694-8716-64776c871af8",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[{'name': 'calculate_total_age_function',\n",
+       "  'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+       "  'parameters': {'type': 'object',\n",
+       "   'properties': {'input_json': {'type': 'string',\n",
+       "     'description': '执行计算年龄总和的数据集'}},\n",
+       "   'required': ['input_json']}}]"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "functions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "331fa317-aeb3-41b7-a302-67a47f3e07d2",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'JSON Schema是一个用于描述JSON数据结构的语言和规范。它定义了一个标准的结构，用于验证JSON数据的格式、类型和约束。\\n\\nJSON Schema是一个JSON对象，包含了一组属性，用于描述JSON数据的结构。下面是一些常见的JSON Schema属性：\\n\\n- `type`：指定一个数据的类型。可以是字符串、数字、布尔值、数组、对象等。\\n- `properties`：定义对象属性的集合。每个属性都有其类型、限制条件等。\\n- `items`：定义数组中元素的类型和约束。\\n- `required`：指定某些属性是必需的。\\n- `minLength`和`maxLength`：限制字符串的最小长度和最大长度。\\n- `minimum`和`maximum`：限制数字的最小值和最大值。\\n- `enum`：定义一个枚举列表，表示属性的取值只能是列表中的一个。\\n- `pattern`：使用正则表达式定义字符串的模式。\\n\\n通过使用JSON Schema，可以验证和验证JSON数据的结构和约束。它可以用于多种场景，例如数据验证、数据格式化和自动生成文档等。\\n\\n例如，下面是一个使用JSON Schema描述一个人的基本信息的例子：\\n\\n```\\n{\\n  \"type\": \"object\",\\n  \"properties\": {\\n    \"name\": {\\n      \"type\": \"string\"\\n    },\\n    \"age\": {\\n      \"type\": \"integer\",\\n      \"minimum\": 0\\n    },\\n    \"email\": {\\n      \"type\": \"string\",\\n      \"format\": \"email\"\\n    }\\n  },\\n  \"required\": [\"name\", \"age\"]\\n}\\n```\\n\\n该Schema描述了一个包含`name`、`age`和`email`属性的对象，其中`name`和`age`是必需的。`name`属性的类型是字符串，`age`属性的类型是整数且最小值为0，`email`属性的类型是字符串且格式必须符合电子邮件的规范。\\n\\n通过验证数据和JSON Schema，可以确保数据的格式、类型和约束符合预期，提高数据的准确性和可靠性。'"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response = openai.ChatCompletion.create(\n",
+    "  model=\"gpt-3.5-turbo-16k-0613\",\n",
+    "  messages=[\n",
+    "    {\"role\": \"user\", \"content\": \"你知道Json Schema对象吗？如果知道的话，请详细的描述一下\"}\n",
+    "  ]\n",
+    ")\n",
+    "\n",
+    "response.choices[0].message['content']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "f56b143e-125b-4c9d-94f6-0cd3c5d5f359",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'JSON Schema是一个用于描述JSON数据结构的语言和规范。它定义了一个标准的结构，用于验证JSON数据的格式、类型和约束。\\n\\nJSON Schema是一个JSON对象，包含了一组属性，用于描述JSON数据的结构。下面是一些常见的JSON Schema属性：\\n\\n- `type`：指定一个数据的类型。可以是字符串、数字、布尔值、数组、对象等。\\n- `properties`：定义对象属性的集合。每个属性都有其类型、限制条件等。\\n- `items`：定义数组中元素的类型和约束。\\n- `required`：指定某些属性是必需的。\\n- `minLength`和`maxLength`：限制字符串的最小长度和最大长度。\\n- `minimum`和`maximum`：限制数字的最小值和最大值。\\n- `enum`：定义一个枚举列表，表示属性的取值只能是列表中的一个。\\n- `pattern`：使用正则表达式定义字符串的模式。\\n\\n通过使用JSON Schema，可以验证和验证JSON数据的结构和约束。它可以用于多种场景，例如数据验证、数据格式化和自动生成文档等。\\n\\n例如，下面是一个使用JSON Schema描述一个人的基本信息的例子：\\n\\n```\\n{\\n  \"type\": \"object\",\\n  \"properties\": {\\n    \"name\": {\\n      \"type\": \"string\"\\n    },\\n    \"age\": {\\n      \"type\": \"integer\",\\n      \"minimum\": 0\\n    },\\n    \"email\": {\\n      \"type\": \"string\",\\n      \"format\": \"email\"\\n    }\\n  },\\n  \"required\": [\"name\", \"age\"]\\n}\\n```\\n\\n该Schema描述了一个包含`name`、`age`和`email`属性的对象，其中`name`和`age`是必需的。`name`属性的类型是字符串，`age`属性的类型是整数且最小值为0，`email`属性的类型是字符串且格式必须符合电子邮件的规范。\\n\\n通过验证数据和JSON Schema，可以确保数据的格式、类型和约束符合预期，提高数据的准确性和可靠性。'"
+      ]
+     },
+     "execution_count": 14,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response.choices[0].message['content']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "5bba278d-d996-48ec-8e24-62cef41c7528",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import inspect\n",
+    "\n",
+    "# 使用inspect模块提取文档字符串\n",
+    "function_declaration = inspect.getdoc(calculate_total_age_function)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "ad8c0de8-0228-478d-adef-fe60b47b2a4c",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "函数说明:\n",
+      "从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\n",
+      "\n",
+      "参数:\n",
+      "input_json (str): 包含个体数据的JSON格式字符串。\n",
+      "\n",
+      "返回:\n",
+      "str: 所有人的年龄总和，以JSON格式返回。\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"函数说明:\")\n",
+    "print(function_declaration)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 65,
+   "id": "193d04bb-5a45-41f0-9dfe-683b639aafc5",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'{\\n  \"type\": \"object\",\\n  \"properties\": {\\n    \"input_json\": {\\n      \"type\": \"string\",\\n      \"description\": \"包含个体数据的JSON格式字符串\"\\n    }\\n  },\\n  \"required\": [\"input_json\"],\\n  \"description\": \"从给定的JSON格式字符串中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\"\\n}'"
+      ]
+     },
+     "execution_count": 65,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response = openai.ChatCompletion.create(\n",
+    "  model=\"gpt-3.5-turbo-16k-0613\",\n",
+    "  messages=[\n",
+    "    {\"role\": \"system\", \"content\": \"你是一位优秀的数据分析师，现在有一个函数的详细声明如下：%s\" % function_declaration},\n",
+    "    {\"role\": \"user\", \"content\": \"请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：\\\n",
+    "                                1. 在JSON Schema对象中，设置函数的参数类型为'object'.\\\n",
+    "                                2. 'properties'字段如果有参数，必须表示出字段的描述. \\\n",
+    "                                3. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.\\\n",
+    "                                4. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数. \\\n",
+    "                                5. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"}\n",
+    "  ]\n",
+    ") "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 67,
+   "id": "cc327f33-a161-430b-9e80-344cf86dbe6a",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'{\\n  \"type\": \"object\",\\n  \"properties\": {\\n    \"input_json\": {\\n      \"type\": \"string\",\\n      \"description\": \"包含个体数据的JSON格式字符串\"\\n    }\\n  },\\n  \"required\": [\"input_json\"],\\n  \"description\": \"从给定的JSON格式字符串中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\"\\n}'"
+      ]
+     },
+     "execution_count": 67,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response.choices[0].message['content']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 68,
+   "id": "5ba34a3f-45f5-4859-a347-99764120ce15",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'type': 'object',\n",
+       " 'properties': {'input_json': {'type': 'string',\n",
+       "   'description': '包含个体数据的JSON格式字符串'}},\n",
+       " 'required': ['input_json'],\n",
+       " 'description': '从给定的JSON格式字符串中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。'}"
+      ]
+     },
+     "execution_count": 68,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "json.loads(response.choices[0].message['content'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 69,
+   "id": "6c235517-ff7e-43bc-a0ca-1016cac99fc5",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'name': 'calculate_total_age_function',\n",
+       " 'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+       " 'parameters': {'type': 'object',\n",
+       "  'properties': {'input_json': {'type': 'string',\n",
+       "    'description': '执行计算年龄总和的数据集'}},\n",
+       "  'required': ['input_json']}}"
+      ]
+     },
+     "execution_count": 69,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "calculate_total_age_describe"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 76,
+   "id": "9dbd294b-ff8a-4406-bdaa-ab56255c777e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 定义system role的Few-shot提示\n",
+    "system_Q = \"你是一位优秀的数据分析师，现在有一个函数的详细声明如下：%s\" % function_declaration\n",
+    "system_A = \"计算年龄总和的函数，该函数从一个特定格式的JSON字符串中解析出DataFrame，然后计算所有人的年龄总和并以JSON格式返回结果。\\\n",
+    "            \\n:param input_json: 必要参数，要求字符串类型，表示含有个体年龄数据的JSON格式字符串 \\\n",
+    "            \\n:return: 计算完成后的所有人年龄总和，返回结果为JSON字符串类型对象\""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 101,
+   "id": "5c199fda-6407-4cc6-8239-56c8976edc88",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 定义user role的Few-shot提示\n",
+    "\n",
+    "user_Q = \"请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：\\\n",
+    "          1. 提取函数名称：%s，并将其用作JSON Schema中的'name'字段  \\\n",
+    "          2. 在JSON Schema对象中，设置函数的参数类型为'object'.\\\n",
+    "          3. 'properties'字段如果有参数，必须表示出字段的描述. \\\n",
+    "          4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.\\\n",
+    "          5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数. \\\n",
+    "          6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"  % calculate_total_age_function.__name__\n",
+    "\n",
+    "user_A = \"{'name': 'calculate_total_age_function', \\\n",
+    "                   'description': '计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。 \\\n",
+    "                   'parameters': {'type': 'object', \\\n",
+    "                                  'properties': {'input_json': {'description': '执行计算年龄总和的数据集', 'type': 'string'}}, \\\n",
+    "                                  'required': ['input_json']}}\""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 100,
+   "id": "3a8da5e3-8025-42d6-94d5-6b3f3ea3fb60",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 定义输入\n",
+    "\n",
+    "system_message = \"你是一位优秀的数据分析师，现在有一个函数的详细声明如下：%s\" % function_declaration\n",
+    "user_message = \"请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：\\\n",
+    "                1. 提取函数名称：%s，并将其用作JSON Schema中的'name'字段  \\\n",
+    "                2. 在JSON Schema对象中，设置函数的参数类型为'object'.\\\n",
+    "                3. 'properties'字段如果有参数，必须表示出字段的描述. \\\n",
+    "                4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.\\\n",
+    "                5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数. \\\n",
+    "                6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"  % calculate_total_age_function.__name__"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 86,
+   "id": "47929d8b-8404-4297-8555-827b6757e275",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'{\\n  \"name\": \"calculate_total_age_function\",\\n  \"type\": \"object\",\\n  \"properties\": {\\n    \"input_json\": {\\n      \"type\": \"string\",\\n      \"description\": \"包含个体数据的JSON格式字符串\"\\n    }\\n  },\\n  \"required\": [\"input_json\"],\\n  \"description\": \"从给定的JSON格式字符串（按\\'split\\'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\"\\n}'"
+      ]
+     },
+     "execution_count": 86,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response = openai.ChatCompletion.create(\n",
+    "  model=\"gpt-3.5-turbo-16k-0613\",\n",
+    "  messages=[\n",
+    "    {\"role\": \"system\", \"content\": system_message},\n",
+    "    {\"role\": \"user\", \"content\": user_message}\n",
+    "  ]\n",
+    ")\n",
+    "response.choices[0].message['content']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 87,
+   "id": "5aeac9a3-b8ac-48b1-ae6e-f0838c6cd1b0",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'name': 'calculate_total_age_function',\n",
+       " 'type': 'object',\n",
+       " 'properties': {'input_json': {'type': 'string',\n",
+       "   'description': '包含个体数据的JSON格式字符串'}},\n",
+       " 'required': ['input_json'],\n",
+       " 'description': \"从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\"}"
+      ]
+     },
+     "execution_count": 87,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "json.loads(response.choices[0].message['content'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 104,
+   "id": "6aecef3e-b33a-4324-b6b5-5533476faa61",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "messages=[\n",
+    "            {\"role\": \"system\", \"content\": \"Q:\" +  system_Q + user_Q + \"A:\" + system_A + user_A },\n",
+    "\n",
+    "            {\"role\": \"user\", \"content\": 'Q:' + system_message + user_message}\n",
+    "]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 105,
+   "id": "9af1ecc6-f1c0-4923-8a28-d9eede0f8df7",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[{'role': 'system',\n",
+       "  'content': \"Q:你是一位优秀的数据分析师，现在有一个函数的详细声明如下：从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\\n\\n参数:\\ninput_json (str): 包含个体数据的JSON格式字符串。\\n\\n返回:\\nstr: 所有人的年龄总和，以JSON格式返回。请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：          1. 提取函数名称：calculate_total_age_function，并将其用作JSON Schema中的'name'字段            2. 在JSON Schema对象中，设置函数的参数类型为'object'.          3. 'properties'字段如果有参数，必须表示出字段的描述.           4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.          5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数.           6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. A:计算年龄总和的函数，该函数从一个特定格式的JSON字符串中解析出DataFrame，然后计算所有人的年龄总和并以JSON格式返回结果。            \\n:param input_json: 必要参数，要求字符串类型，表示含有个体年龄数据的JSON格式字符串             \\n:return: 计算完成后的所有人年龄总和，返回结果为JSON字符串类型对象{'name': 'calculate_total_age_function',                    'description': '计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。                    'parameters': {'type': 'object',                                   'properties': {'input_json': {'description': '执行计算年龄总和的数据集', 'type': 'string'}},                                   'required': ['input_json']}}\"},\n",
+       " {'role': 'user',\n",
+       "  'content': \"Q:你是一位优秀的数据分析师，现在有一个函数的详细声明如下：从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\\n\\n参数:\\ninput_json (str): 包含个体数据的JSON格式字符串。\\n\\n返回:\\nstr: 所有人的年龄总和，以JSON格式返回。请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：                1. 提取函数名称：calculate_total_age_function，并将其用作JSON Schema中的'name'字段                  2. 在JSON Schema对象中，设置函数的参数类型为'object'.                3. 'properties'字段如果有参数，必须表示出字段的描述.                 4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.                5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数.                 6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"}]"
+      ]
+     },
+     "execution_count": 105,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "messages"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 102,
+   "id": "125efe2e-ba4f-4803-aa87-2de5a4f73f93",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'{\\n  \"name\": \"calculate_total_age_function\",\\n  \"description\": \"计算年龄总和的函数，从给定的JSON格式字符串（按\\'split\\'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\\n  \"parameters\": {\\n    \"type\": \"object\",\\n    \"properties\": {\\n      \"input_json\": {\\n        \"description\": \"执行计算年龄总和的数据集\",\\n        \"type\": \"string\"\\n      }\\n    },\\n    \"required\": [\\n      \"input_json\"\\n    ]\\n  }\\n}'"
+      ]
+     },
+     "execution_count": 102,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "response = openai.ChatCompletion.create(\n",
+    "                  model=\"gpt-3.5-turbo-16k-0613\",\n",
+    "                  messages=messages\n",
+    "                )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "38c196c0-5536-4d5f-8f9d-13ca4922218d",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 103,
+   "id": "6dfd93f9-3407-461f-b4d2-294084565628",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'name': 'calculate_total_age_function',\n",
+       " 'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+       " 'parameters': {'type': 'object',\n",
+       "  'properties': {'input_json': {'description': '执行计算年龄总和的数据集',\n",
+       "    'type': 'string'}},\n",
+       "  'required': ['input_json']}}"
+      ]
+     },
+     "execution_count": 103,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "json.loads(response.choices[0].message['content'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 106,
+   "id": "d7989072-fe11-419d-b93c-3e3d4bca295e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "system_prompt = \"Q:\" +  system_Q + user_Q + \"A:\" + system_A + user_A\n",
+    "user_prompt = 'Q:' + system_message + user_message"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 107,
+   "id": "a5776886-d38c-44b4-bccf-0541032d8a2b",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "\"Q:你是一位优秀的数据分析师，现在有一个函数的详细声明如下：从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\\n\\n参数:\\ninput_json (str): 包含个体数据的JSON格式字符串。\\n\\n返回:\\nstr: 所有人的年龄总和，以JSON格式返回。请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：                1. 提取函数名称：calculate_total_age_function，并将其用作JSON Schema中的'name'字段                  2. 在JSON Schema对象中，设置函数的参数类型为'object'.                3. 'properties'字段如果有参数，必须表示出字段的描述.                 4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.                5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数.                 6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \""
+      ]
+     },
+     "execution_count": 107,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "user_prompt"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "78a39fd9-f89a-4272-8a94-e2cc66b5bfea",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class AutoFunctionGenerator:\n",
+    "    \n",
+    "    def __init__(self, functions_list, max_attempts=3):\n",
+    "        self.functions_list = functions_list\n",
+    "        self.max_attempts = max_attempts\n",
+    "\n",
+    "    def generate_function_descriptions(self):\n",
+    "         # 创建空列表，保存每个功能函数的JSON Schema描述\n",
+    "        functions = []\n",
+    "        \n",
+    "        for function in self.functions_list:\n",
+    "            \n",
+    "            # 读取指定函数的函数说明\n",
+    "            function_description = inspect.getdoc(function)\n",
+    "            \n",
+    "            # 读取函数的函数名\n",
+    "            function_name = function.__name__\n",
+    "            \n",
+    "            # 定义system role的Few-shot提示\n",
+    "            system_Q = \"你是一位优秀的数据分析师，现在有一个函数的详细声明如下：%s\" % function_description\n",
+    "            system_A = \"计算年龄总和的函数，该函数从一个特定格式的JSON字符串中解析出DataFrame，然后计算所有人的年龄总和并以JSON格式返回结果。\\\n",
+    "                        \\n:param input_json: 必要参数，要求字符串类型，表示含有个体年龄数据的JSON格式字符串 \\\n",
+    "                        \\n:return: 计算完成后的所有人年龄总和，返回结果为JSON字符串类型对象\"\n",
+    "            \n",
+    "            \n",
+    "            # 定义user role的Few-shot提示\n",
+    "            user_Q = \"请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：\\\n",
+    "                      1. 提取函数名称：%s，并将其用作JSON Schema中的'name'字段  \\\n",
+    "                      2. 在JSON Schema对象中，设置函数的参数类型为'object'.\\\n",
+    "                      3. 'properties'字段如果有参数，必须表示出字段的描述. \\\n",
+    "                      4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.\\\n",
+    "                      5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数. \\\n",
+    "                      6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"  % function_name\n",
+    "\n",
+    "            user_A = \"{'name': 'calculate_total_age_function', \\\n",
+    "                               'description': '计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。 \\\n",
+    "                               'parameters': {'type': 'object', \\\n",
+    "                                              'properties': {'input_json': {'description': '执行计算年龄总和的数据集', 'type': 'string'}}, \\\n",
+    "                                              'required': ['input_json']}}\"\n",
+    "            \n",
+    "            \n",
+    "            # 定义输入\n",
+    "\n",
+    "            system_message = \"你是一位优秀的数据分析师，现在有一个函数的详细声明如下：%s\" % function_description\n",
+    "            user_message = \"请根据这个函数声明，为我生成一个JSON Schema对象描述。这个描述应该清晰地标明函数的输入和输出规范。具体要求如下：\\\n",
+    "                            1. 提取函数名称：%s，并将其用作JSON Schema中的'name'字段  \\\n",
+    "                            2. 在JSON Schema对象中，设置函数的参数类型为'object'.\\\n",
+    "                            3. 'properties'字段如果有参数，必须表示出字段的描述. \\\n",
+    "                            4. 从函数声明中解析出函数的描述，并在JSON Schema中以中文字符形式表示在'description'字段.\\\n",
+    "                            5. 识别函数声明中哪些参数是必需的，然后在JSON Schema的'required'字段中列出这些参数. \\\n",
+    "                            6. 输出的应仅为符合上述要求的JSON Schema对象内容,不需要任何上下文修饰语句. \"  % function_name\n",
+    "            \n",
+    "            messages=[\n",
+    "                        {\"role\": \"system\", \"content\": \"Q:\" +  system_Q + user_Q + \"A:\" + system_A + user_A },\n",
+    "\n",
+    "                        {\"role\": \"user\", \"content\": 'Q:' + system_message + user_message}\n",
+    "            ]\n",
+    "\n",
+    "            response = self._call_openai_api(messages)\n",
+    "            functions.append(json.loads(response.choices[0].message['content']))\n",
+    "        return functions\n",
+    "\n",
+    "    def _call_openai_api(self, messages):\n",
+    "        # 请根据您的实际情况修改此处的 API 调用\n",
+    "        return openai.ChatCompletion.create(\n",
+    "            model=\"gpt-3.5-turbo-16k-0613\",\n",
+    "            messages=messages,\n",
+    "        )\n",
+    "    \n",
+    "    def auto_generate(self):\n",
+    "        attempts = 0\n",
+    "        while attempts < self.max_attempts:\n",
+    "            try:\n",
+    "                functions = self.generate_function_descriptions()\n",
+    "                return functions\n",
+    "            except Exception as e:\n",
+    "                attempts += 1\n",
+    "                print(f\"Error occurred: {e}\")\n",
+    "                if attempts >= self.max_attempts:\n",
+    "                    print(\"Reached maximum number of attempts. Terminating.\")\n",
+    "                    raise\n",
+    "                else:\n",
+    "                    print(\"Retrying...\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 109,
+   "id": "b02d820b-c8c9-4857-96a2-70aff489ced0",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[{'name': 'calculate_total_age_function', 'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\", 'parameters': {'type': 'object', 'properties': {'input_json': {'description': '执行计算年龄总和的数据集', 'type': 'string'}}, 'required': ['input_json']}}]\n"
+     ]
+    }
+   ],
+   "source": [
+    "if __name__ == '__main__':\n",
+    "    # 示例函数列表\n",
+    "    def calculate_total_age_function(input_json):\n",
+    "        \"\"\"\n",
+    "        从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\n",
+    "\n",
+    "        参数:\n",
+    "        input_json (str): 包含个体数据的JSON格式字符串。\n",
+    "\n",
+    "        返回:\n",
+    "        str: 所有人的年龄总和，以JSON格式返回。\n",
+    "        \"\"\"\n",
+    "\n",
+    "        # 将JSON字符串转换为DataFrame\n",
+    "        df = pd.read_json(input_json, orient='split')\n",
+    "\n",
+    "        # 计算所有人的年龄总和\n",
+    "        total_age = df['Age'].sum()\n",
+    "\n",
+    "        # 将结果转换为字符串形式，然后使用json.dumps()转换为JSON格式\n",
+    "        return json.dumps({\"total_age\": str(total_age)})\n",
+    "\n",
+    "    functions_list = [calculate_total_age_function]\n",
+    "    generator = AutoFunctionGenerator(functions_list)\n",
+    "    function_descriptions = generator.auto_generate()\n",
+    "    print(function_descriptions)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 110,
+   "id": "72289ab8-55ae-43b6-906f-b68887b2314d",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[{'name': 'calculate_total_age_function',\n",
+       "  'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+       "  'parameters': {'type': 'object',\n",
+       "   'properties': {'input_json': {'description': '执行计算年龄总和的数据集',\n",
+       "     'type': 'string'}},\n",
+       "   'required': ['input_json']}}]"
+      ]
+     },
+     "execution_count": 110,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "function_descriptions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "a8e3444b-d1d9-4da4-a4a5-eafefdd397ab",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 创建一个稍微复杂的DataFrame，包含多种数据类型\n",
+    "df_complex = pd.DataFrame({\n",
+    " 'Name': ['Alice', 'Bob', 'Charlie'],\n",
+    " 'Age': [25, 30, 35],\n",
+    " 'Salary': [50000.0, 100000.5, 150000.75],\n",
+    " 'IsMarried': [True, False, True]\n",
+    "})\n",
+    "\n",
+    "# 将DataFrame转换为JSON格式,orient='split'参数将数据、索引和列分开存储\n",
+    "df_complex_json = df_complex.to_json(orient='split')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "a5aa9b66-ca40-4229-8433-377776f9ac75",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def calculate_married_count(input_json):\n",
+    "    \"\"\"\n",
+    "    从给定的JSON格式字符串中解析出DataFrame，计算结婚人数，并以JSON格式返回结果。\n",
+    "\n",
+    "    参数:\n",
+    "    input_json (str): 包含个体数据（其中包括婚姻状态）的JSON格式字符串。\n",
+    "\n",
+    "    返回:\n",
+    "    str: 结婚人数，以JSON格式返回。\n",
+    "    \"\"\"\n",
+    "\n",
+    "    # 将JSON字符串转换为DataFrame\n",
+    "    df = pd.read_json(input_json, orient='split')\n",
+    "\n",
+    "    # 计算结婚人数\n",
+    "    married_count = df[df['IsMarried'] == True ].shape[0]\n",
+    "\n",
+    "    # 将结果转换为字符串形式，然后使用json.dumps()转换为JSON格式\n",
+    "    return json.dumps({\"married_count\": str(married_count)})"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "9574cff4-9d45-43bc-bbc8-c194a72f7715",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'{\"married_count\": \"2\"}'"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "calculate_married_count(df_complex_json)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "bb4826c3-9c2f-4087-aac9-b8b3f0c3ff3d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "if __name__ == '__main__':\n",
+    "    # 测试函数1\n",
+    "    def calculate_total_age_function(input_json):\n",
+    "        \"\"\"\n",
+    "        从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\n",
+    "\n",
+    "        参数:\n",
+    "        input_json (str): 包含个体数据的JSON格式字符串。\n",
+    "\n",
+    "        返回:\n",
+    "        str: 所有人的年龄总和，以JSON格式返回。\n",
+    "        \"\"\"\n",
+    "\n",
+    "        # 将JSON字符串转换为DataFrame\n",
+    "        df = pd.read_json(input_json, orient='split')\n",
+    "\n",
+    "        # 计算所有人的年龄总和\n",
+    "        total_age = df['Age'].sum()\n",
+    "\n",
+    "        # 将结果转换为字符串形式，然后使用json.dumps()转换为JSON格式\n",
+    "        return json.dumps({\"total_age\": str(total_age)})\n",
+    "    \n",
+    "    # 测试函数2\n",
+    "    def calculate_married_count(input_json):\n",
+    "        \"\"\"\n",
+    "        从给定的JSON格式字符串中解析出DataFrame，计算结婚人数，并以JSON格式返回结果。\n",
+    "\n",
+    "        参数:\n",
+    "        input_json (str): 包含个体数据（其中包括婚姻状态）的JSON格式字符串。\n",
+    "\n",
+    "        返回:\n",
+    "        str: 结婚人数，以JSON格式返回。\n",
+    "        \"\"\"\n",
+    "\n",
+    "        # 将JSON字符串转换为DataFrame\n",
+    "        df = pd.read_json(input_json, orient='split')\n",
+    "\n",
+    "        # 计算结婚人数\n",
+    "        married_count = df[df['IsMarried'] == True ].shape[0]\n",
+    "\n",
+    "        # 将结果转换为字符串形式，然后使用json.dumps()转换为JSON格式\n",
+    "        return json.dumps({\"married_count\": str(married_count)})\n",
+    "    \n",
+    "\n",
+    "    functions_list = [calculate_total_age_function, calculate_married_count]\n",
+    "    generator = AutoFunctionGenerator(functions_list)\n",
+    "    function_descriptions = generator.auto_generate()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "2f0604e3-a96e-40f9-8579-83b7ab207ab2",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[{'name': 'calculate_total_age_function',\n",
+       "  'description': \"计算年龄总和的函数，从给定的JSON格式字符串（按'split'方向排列）中解析出DataFrame，计算所有人的年龄总和，并以JSON格式返回结果。\",\n",
+       "  'parameters': {'type': 'object',\n",
+       "   'properties': {'input_json': {'description': '执行计算年龄总和的数据集',\n",
+       "     'type': 'string'}},\n",
+       "   'required': ['input_json']}},\n",
+       " {'name': 'calculate_married_count',\n",
+       "  'description': '从给定的JSON格式字符串中解析出DataFrame，计算结婚人数，并以JSON格式返回结果。',\n",
+       "  'parameters': {'type': 'object',\n",
+       "   'properties': {'input_json': {'description': '包含个体数据（其中包括婚姻状态）的JSON格式字符串。',\n",
+       "     'type': 'string'}},\n",
+       "   'required': ['input_json']}}]"
+      ]
+     },
+     "execution_count": 17,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "function_descriptions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ef4a4797-2f87-4d12-a158-d6e85fb494bd",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "bf93802b-42a5-4fd8-b8ec-1a0005736a1e",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'calculate_total_age_function': <function __main__.calculate_total_age_function(input_json)>,\n",
+       " 'calculate_married_count': <function __main__.calculate_married_count(input_json)>}"
+      ]
+     },
+     "execution_count": 18,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "function_dict = {func.__name__: func for func in functions_list}\n",
+    "function_dict"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 110,
+   "id": "eaafbcb1-fbcf-4f91-900d-903b779d11a3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ChatConversation:\n",
+    "    \"\"\"\n",
+    "    ChatConversation 类用于与 OpenAI GPT-3 模型进行聊天对话，并可选地调用外部功能函数。\n",
+    "    \n",
+    "    属性:\n",
+    "    - model (str): 使用的 OpenAI GPT模型名称。\n",
+    "    - messages (list): 存储与 GPT 模型之间的消息。\n",
+    "    - function_repository (dict): 存储可选的外部功能函数。\n",
+    "    \n",
+    "    方法:\n",
+    "    - __init__ : 初始化 ChatConversation 类。\n",
+    "    - add_functions : 添加外部功能函数到功能仓库。\n",
+    "    - _call_chat_model : 调用 OpenAI GPT 模型进行聊天。\n",
+    "    - run : 运行聊天会话并获取最终的响应。\n",
+    "    \"\"\"\n",
+    "    def __init__(self, model=\"gpt-3.5-turbo-16k-0613\"):\n",
+    "        \"\"\"\n",
+    "        初始化ChatConversation类。\n",
+    "        \"\"\"\n",
+    "        self.model = model\n",
+    "        self.messages = []\n",
+    "        self.function_repository = {}\n",
+    "    \n",
+    "    def add_functions(self, functions_list):\n",
+    "        \"\"\"\n",
+    "        添加功能函数到功能仓库。\n",
+    "\n",
+    "        参数:\n",
+    "        functions_list (list): 包含功能函数的列表。\n",
+    "        \"\"\"\n",
+    "        self.function_repository = {func.__name__: func for func in functions_list}\n",
+    "\n",
+    "    def _call_chat_model(self, functions=None, include_functions=False):\n",
+    "        \"\"\"\n",
+    "        调用大模型。\n",
+    "\n",
+    "        参数:\n",
+    "        functions (dict): 功能函数的描述。\n",
+    "        include_functions (bool): 是否包括功能函数和自动功能调用。\n",
+    "\n",
+    "        返回:\n",
+    "        dict: 大模型的响应。\n",
+    "        \"\"\"\n",
+    "        params = {\n",
+    "            \"model\": self.model,\n",
+    "            \"messages\": self.messages,\n",
+    "        }\n",
+    "\n",
+    "        if include_functions:\n",
+    "            params['functions'] = functions\n",
+    "            params['function_call'] = \"auto\"\n",
+    "\n",
+    "        try:\n",
+    "            return openai.ChatCompletion.create(**params)\n",
+    "        except Exception as e:\n",
+    "            print(f\"Error calling chat model: {e}\")\n",
+    "            return None\n",
+    "\n",
+    "\n",
+    "    def run(self, functions_list=None):\n",
+    "        \"\"\"\n",
+    "        运行聊天会话，可能包括外部功能函数调用。\n",
+    "        \n",
+    "        参数:\n",
+    "        functions_list (list): 包含功能函数的列表。如果为 None，则只进行常规对话。\n",
+    "\n",
+    "        返回:\n",
+    "        str: 最终的聊天模型响应。\n",
+    "        \"\"\"\n",
+    "        try:\n",
+    "            # 如果不传入外部函数仓库，就进行常规的对话\n",
+    "            if functions_list is None:\n",
+    "                response = self._call_chat_model()\n",
+    "                final_response = response[\"choices\"][0][\"message\"][\"content\"]\n",
+    "                return final_response\n",
+    "            \n",
+    "            else:\n",
+    "            \n",
+    "                # 添加功能函数到功能仓库\n",
+    "                self.add_functions(functions_list)\n",
+    "\n",
+    "                # 如果存在外部的功能函数，生成每个功能函数对应的JSON Schema对象描述\n",
+    "                functions = AutoFunctionGenerator(functions_list).auto_generate()\n",
+    "\n",
+    "                # 第一次调用大模型，获取到first reponse\n",
+    "                response = self._call_chat_model(functions, include_functions=True)\n",
+    "                response_message = response[\"choices\"][0][\"message\"]\n",
+    "\n",
+    "                # 检查在first reponse中是否存在function_call，如果存在，说明需要调用到外部函数仓库\n",
+    "                if \"function_call\" in response_message:\n",
+    "\n",
+    "                    # 获取函数名\n",
+    "                    function_name = response_message[\"function_call\"][\"name\"]\n",
+    "\n",
+    "                    # 获取函数对象\n",
+    "                    function_call_exist = self.function_repository.get(function_name)\n",
+    "\n",
+    "                    if not function_call_exist:\n",
+    "                        print(f\"Function {function_name} not found in functions repository.\")\n",
+    "                        return None\n",
+    "\n",
+    "                    # 获取函数关键参数信息\n",
+    "                    function_args = json.loads(response_message[\"function_call\"][\"arguments\"])\n",
+    "\n",
+    "                    # 获取函数逻辑处理后的结果\n",
+    "                    function_response = function_call_exist(**function_args)\n",
+    "\n",
+    "                    # messages = 原始输入 + first reponse + function_response\n",
+    "\n",
+    "                    # messages中拼接first response消息\n",
+    "                    self.messages.append(response_message)  \n",
+    "                    # messages中拼接函数输出结果\n",
+    "                    self.messages.append(\n",
+    "                        {\n",
+    "                            \"role\": \"function\",\n",
+    "                            \"name\": function_name,\n",
+    "                            \"content\": function_response,\n",
+    "                        }\n",
+    "                    )  \n",
+    "\n",
+    "\n",
+    "                    # 第二次调用模型\n",
+    "                    second_response = self._call_chat_model()\n",
+    "\n",
+    "                    # 获取最终的计算结果\n",
+    "                    final_response = second_response[\"choices\"][0][\"message\"][\"content\"]\n",
+    "\n",
+    "                else:\n",
+    "                    final_response = response_message[\"content\"]\n",
+    "\n",
+    "                return final_response\n",
+    "\n",
+    "        except Exception as e:\n",
+    "            print(f\"An error occurred: {e}\")\n",
+    "            return None"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 112,
+   "id": "c65352b8-2ff8-4930-9dbb-fa6d6dcd15a7",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "要计算所有人年龄的总和，可以按照以下的步骤进行：\n",
+      "\n",
+      "1. 首先，将JSON字符串转换为Python的字典对象：\n",
+      "```\n",
+      "import json\n",
+      "\n",
+      "input_json = '{\"columns\":[\"Name\",\"Age\",\"Salary\",\"IsMarried\"],\"index\":[0,1,2],\"data\":[[\"Alice\",25,50000.0,true],[\"Bob\",30,100000.5,false],[\"Charlie\",35,150000.75,true]]}'\n",
+      "\n",
+      "data = json.loads(input_json)\n",
+      "```\n",
+      "\n",
+      "2. 然后，从字典对象中提取出年龄数据：\n",
+      "```\n",
+      "age_data = data[\"data\"]\n",
+      "```\n",
+      "\n",
+      "3. 最后，使用一个循环将所有人的年龄相加：\n",
+      "```\n",
+      "age_sum = 0\n",
+      "\n",
+      "for person in age_data:\n",
+      "    age_sum += person[1]\n",
+      "\n",
+      "print(age_sum)\n",
+      "```\n",
+      "输出结果即为所有人年龄的总和。在这个例子中，输出结果为90。\n",
+      "\n",
+      "完整的代码如下：\n",
+      "```python\n",
+      "import json\n",
+      "\n",
+      "input_json = '{\"columns\":[\"Name\",\"Age\",\"Salary\",\"IsMarried\"],\"index\":[0,1,2],\"data\":[[\"Alice\",25,50000.0,true],[\"Bob\",30,100000.5,false],[\"Charlie\",35,150000.75,true]]}'\n",
+      "\n",
+      "data = json.loads(input_json)\n",
+      "age_data = data[\"data\"]\n",
+      "\n",
+      "age_sum = 0\n",
+      "\n",
+      "for person in age_data:\n",
+      "    age_sum += person[1]\n",
+      "\n",
+      "print(age_sum)\n",
+      "```\n"
+     ]
+    }
+   ],
+   "source": [
+    "if __name__ == '__main__':\n",
+    "    # 创建一个ChatConversation实例\n",
+    "    conv = ChatConversation()\n",
+    "    \n",
+    "    conv.messages = [\n",
+    "     {\"role\": \"system\", \"content\": \"你是一位优秀的数据分析师, 现在有这样一个数据集input_json：%s，数据集以JSON形式呈现\" % df_complex_json},\n",
+    "     {\"role\": \"user\", \"content\": \"请在数据集input_json上执行计算所有人年龄总和函数\"}\n",
+    " ]\n",
+    "    # 运行对话\n",
+    "    result = conv.run()\n",
+    "    print(result)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 107,
+   "id": "9ee36af4-907c-43da-92c9-5bf5b475842b",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "根据给定的数据集，所有人的年龄总和为90岁。\n"
+     ]
+    }
+   ],
+   "source": [
+    "functions_list = [calculate_total_age_function, calculate_married_count]\n",
+    "\n",
+    "if __name__ == '__main__':\n",
+    "    # 创建一个ChatConversation实例\n",
+    "    conv = ChatConversation()\n",
+    "    \n",
+    "    conv.messages = [\n",
+    "     {\"role\": \"system\", \"content\": \"你是一位优秀的数据分析师, 现在有这样一个数据集input_json：%s，数据集以JSON形式呈现\" % df_complex_json},\n",
+    "     {\"role\": \"user\", \"content\": \"请在数据集input_json上执行计算所有人年龄总和函数\"}\n",
+    " ]\n",
+    " #    # 运行对话\n",
+    "    result = conv.run(functions_list=functions_list)\n",
+    "    print(result)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e3cc042f-e4d1-4191-91f4-56e79d645058",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 116,
+   "id": "b022c85d-0da1-4810-a046-a539a43aea28",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def chat_with_assistant(functions_list=None, \n",
+    "                        prompt=\"您好！\", \n",
+    "                        model=\"gpt-3.5-turbo-16k-0613\", \n",
+    "                        system_message=\"你是我的专属小助理\"):\n",
+    "    \n",
+    "    # 创建ChatConversation实例\n",
+    "    chat_conversation = ChatConversation(model=model)\n",
+    "    \n",
+    "    # 添加系统消息和用户输入到messages列表中\n",
+    "    messages = [{\"role\": \"system\", \"content\": system_message}]\n",
+    "    messages.append({\"role\": \"user\", \"content\": prompt})\n",
+    "    chat_conversation.messages = messages\n",
+    "    \n",
+    "    while True:\n",
+    "        # 调用run方法处理对话，并得到模型的回答\n",
+    "        answer = chat_conversation.run(functions_list=functions_list)\n",
+    "        \n",
+    "        # 打印模型的回答\n",
+    "        print(f\"模型回答: {answer}\")\n",
+    "        \n",
+    "        # 添加模型的回答到messages列表中\n",
+    "        messages.append({\"role\": \"assistant\", \"content\": answer})\n",
+    "        \n",
+    "        # 询问用户是否还有其他问题\n",
+    "        user_input = input(\"如何没有其他问题，可以输入'退出'结束对话): \")\n",
+    "        \n",
+    "        # 如果用户输入'退出'，则结束对话\n",
+    "        if user_input.lower() == \"退出\":\n",
+    "            break\n",
+    "        \n",
+    "        # 添加用户的问题到messages列表中\n",
+    "        messages.append({\"role\": \"user\", \"content\": user_input})\n",
+    "        \n",
+    "        # 更新ChatConversation实例的messages列表\n",
+    "        chat_conversation.messages = messages"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 118,
+   "id": "c2d7771e-f976-4411-8330-d2d217e58760",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Error occurred: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)\n",
+      "Retrying...\n",
+      "模型回答: 您好！有什么可以帮助您的吗？\n"
+     ]
+    },
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "如何没有其他问题，可以输入'退出'结束对话):  你好，我现在有这样一份数据集：input_json = '{\"columns\":[\"Name\",\"Age\",\"Salary\",\"IsMarried\"],\"index\":[0,1,2],\"data\":[[\"Alice\",25,50000.0,true],[\"Bob\",30,100000.5,false],[\"Charlie\",35,150000.75,true]]}' 你能理解吗？\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "模型回答: 是的，我可以理解这个数据集的格式。它是一个包含姓名、年龄、薪水和婚姻状态的数据集。每一列都有对应信息的标签，并且有三行数据记录不同的个体信息。如需对该数据集进行一些分析或计算，我可以帮助您。请问您有什么具体的需求吗？\n"
+     ]
+    },
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "如何没有其他问题，可以输入'退出'结束对话):  我现在想基于这个数据集计算所有人年龄总和是多少\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "模型回答: 根据您提供的数据集，计算所有人年龄总和是90岁。\n"
+     ]
+    },
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "如何没有其他问题，可以输入'退出'结束对话):  退出\n"
+     ]
+    }
+   ],
+   "source": [
+    "# 外部函数列表里\n",
+    "functions_list = [calculate_total_age_function, calculate_married_count]\n",
+    "\n",
+    "# 调用chat_with_assistant函数开始多轮对话\n",
+    "chat_with_assistant(functions_list=functions_list)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7b08c4bb-089e-426b-8ead-ad0bdf7c4a08",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
